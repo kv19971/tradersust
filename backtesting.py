@@ -15,7 +15,7 @@ import math
 import seaborn as sns
 import time
 import tkinter
-from tkinter import ttk
+from tkinter import Tk, StringVar, ttk
 import webbrowser
 from datetime import datetime, timedelta
 '''todo - add dashboard with current holdings and their prices 
@@ -99,19 +99,70 @@ stocklist.pack(fill=tkinter.BOTH)
 tkinter.Button(dash, text="Quit", command=dash.quit).pack()
 dash.pack()
 #---Display stocks bought and sold + Form for adding stocks ---#
-stform = tkinter.Frame(fr_list[6])
-tkinter.Label(stform, text="Stock Code").grid(row=0, column=0)
-tkinter.Label(stform, text="   ").grid(row=0, column=2)
-tkinter.Label(stform, text="Quantity").grid(row=0, column=3)
-tkinter.Label(stform, text="   ").grid(row=0, column=5)
-tkinter.Button(stform, text="Add Entry", command=addEntry).grid(row=0, column=6)
+#---Display stocks bought and sold + Form for adding stocks ---#
 
+def test(event):
+    box = event.widget
+    print(box['values'][box.current()] + " selected!")
+
+def box(parent, values, r, c):
+    value = StringVar()
+    box = ttk.Combobox(parent, textvariable=value)
+    box['values'] = values
+    box.current(0)
+    box.grid(column=c, row=r)
+    box.bind("<FocusIn>", test)
+    return box
+
+stform = tkinter.Frame(fr_list[6])
+tkinter.Label(stform, text="Stock Code: ").grid(row=1, column=0)
+tkinter.Label(stform, text="   ").grid(row=1, column=2)
+tkinter.Label(stform, text="Quantity: ").grid(row=1, column=3)
+tkinter.Label(stform, text="   ").grid(row=1, column=5)
+priceBox = tkinter.Label(stform, text="Price: ")
+priceBox.grid(row=3, column=3)
+tkinter.Button(stform, text="Execute", command=addEntry).grid(row=5, column=3)
+tkinter.Label(stform, text="Order type: ").grid(row=3, column=0)
+orderTypeSelect = box(stform, ('Buy', 'Sell', 'Buy-to-cover', 'Short-sell'), 3, 1)
+print(orderTypeSelect['values'])
+stockPrice = -1
+quantity = 0
+
+def updatePrice(event): 
+    print("Updating price!")
+    try:
+        quantity = float(e2.get())
+    except ValueError:
+        return 0
+    if(orderTypeSelect.current() <= 0):
+        priceBox.config(text = "Set order type first!")
+        return
+    if(stockPrice < 0):
+        priceBox.config(text = "Stock ticker invalid!")
+        return
+    if(quantity <= 0):
+        priceBox.config(text = "Invalid quantity!")
+        return
+    priceBox.config(text = "Price: $" + str(stockPrice*quantity))
+
+def calculatePrice(event):
+    print("Calculating price!")
+    ticker = event.widget.get()
+    if(len(ticker) > 3):
+        end = datetime.utcnow()
+        start = end - timedelta(days = 7)
+        df = web.DataReader(ticker, "yahoo", start, end)
+        stockPrice = float(format(df["Close"][df.index[len(df.index)-1]], '.2f'))
+        print(stockPrice)
+    updatePrice(0)
 
 e1 = tkinter.Entry(stform)
+e1.bind("<Key>", calculatePrice)
 e2 = tkinter.Entry(stform)
+e2.bind("<Key>", updatePrice)
 
-e1.grid(row=0, column=1)
-e2.grid(row=0, column=4)
+e1.grid(row=1, column=1)
+e2.grid(row=1, column=4)
 
 stform.pack()
 
