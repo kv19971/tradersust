@@ -15,11 +15,9 @@ import math
 import seaborn as sns
 import time
 import tkinter
-from tkinter import ttk
-import webbrowser
-from datetime import datetime, timedelta
+from tkinter import Tk, StringVar, ttk
+from datetime import datetime, timedelta, date
 '''todo - add dashboard with current holdings and their prices 
-dashboard - hit ratios, win ratios and profit ratios, average return per trade - current holdings - quit button 
 add execution tab which allows users to add stocks and show the price when adding stocks
 
 '''
@@ -34,8 +32,6 @@ def addEntry():
         writer = csv.writer(fl, delimiter=',')
         writer.writerow([curdate, code, qty])
     os.execl(sys.executable, sys.executable, *sys.argv)
-
-
 
 n = ttk.Notebook(top)
 fr_list = []
@@ -52,71 +48,85 @@ n.add(fr_list[5], text="Backtesting without fixed start")
 n.add(fr_list[6], text="Stocks")
 
 n.pack()
-raw_csvDF = pd.read_csv("traderAction.csv")
+def qutprogram():
+    top.destroy()
 #---Dashboard---#
 dash = tkinter.Frame(fr_list[0])
+tkinter.Button(dash, text="Quit", command=qutprogram)
 
-lf = tkinter.LabelFrame(fr_list[0], text="Performance Overview", padx=20, pady=20)
-lf.pack(fill=tkinter.BOTH)
-hr = tkinter.LabelFrame(lf, text="Hit Ratios", padx=50, pady=20)
-hr.pack(side=tkinter.LEFT)
-wr = tkinter.LabelFrame(lf, text="Other Ratios", padx=50, pady=20)
-wr.pack(side=tkinter.RIGHT)
-def observeStock(stockName, start_date, attribute = 'Close'):
-    'observe attribute of an arbitrary stock within the time specified'
-    'start_date and end_date must be in format %Y-%m-%d'
-    'attribute can be Open, High, Low, Close, Volume or Adj Close'
-    start_date = dt.strptime(start_date, "%d/%m/%Y").strftime("%Y-%m-%d")
-    end_date = curdate = (datetime.now() - timedelta(days=1)).strftime("%Y/%m/%d")
-    sepwin = tkinter.Toplevel()
-    confr = tkinter.Frame(sepwin)
-    f = plt.figure(1, figsize=(10,8))
-    df = web.DataReader(stockName, "yahoo", start_date, end_date)
-    X = df.index
-    Y = df[attribute]
-    plt.plot(X, Y)
-    plt.margins(0.02)
-    plt.xlabel('Date')
-    plt.ylabel(attribute)
-    canvas = FigureCanvasTkAgg(f, master=confr)
-    canvas.show()
-    canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=1)
-    canvas.update_idletasks()
-    confr.pack()
-
-
-stocklist = tkinter.LabelFrame(fr_list[0], text="Recent Transactions", padx=20, pady=20)
-for d in raw_csvDF.tail(5).iterrows():
-    act = ""
-    if (d[1]['Quantity'] < 0):
-        act="Sold"
-    else:
-        act="Bought"
-    tkinter.Button(stocklist, text=act+" "+str(abs(d[1]['Quantity']))+" of "+str(d[1]['Symbol'])+" on "+d[1]['Date'], anchor=tkinter.W, justify=tkinter.LEFT, command=lambda sym=str(d[1]['Symbol']), date=str(d[1]['Date']): observeStock(sym, date)).pack(fill=tkinter.X)
-
-
-stocklist.pack(fill=tkinter.BOTH)
-tkinter.Button(dash, text="Quit", command=dash.quit).pack()
+ratios = tkinter.LabelFrame(dash, text="Performance Ratios", padx=5, pady=5)
+ratios.pack()
 dash.pack()
-#---Display stocks bought and sold + Form for adding stocks ---#
-stform = tkinter.Frame(fr_list[6])
-tkinter.Label(stform, text="Stock Code").grid(row=0, column=0)
-tkinter.Label(stform, text="   ").grid(row=0, column=2)
-tkinter.Label(stform, text="Quantity").grid(row=0, column=3)
-tkinter.Label(stform, text="   ").grid(row=0, column=5)
-tkinter.Button(stform, text="Add Entry", command=addEntry).grid(row=0, column=6)
 
+#---Display stocks bought and sold + Form for adding stocks ---#
+
+def test(event):
+    box = event.widget
+    print(box['values'][box.current()] + " selected!")
+
+def box(parent, values, r, c):
+    value = StringVar()
+    box = ttk.Combobox(parent, textvariable=value)
+    box['values'] = values
+    box.current(0)
+    box.grid(column=c, row=r)
+    box.bind("<FocusIn>", test)
+    return box
+
+stform = tkinter.Frame(fr_list[6])
+tkinter.Label(stform, text="Stock Code: ").grid(row=1, column=0)
+tkinter.Label(stform, text="   ").grid(row=1, column=2)
+tkinter.Label(stform, text="Quantity: ").grid(row=1, column=3)
+tkinter.Label(stform, text="   ").grid(row=1, column=5)
+priceBox = tkinter.Label(stform, text="Price: ")
+priceBox.grid(row=3, column=3)
+tkinter.Button(stform, text="Execute", command=addEntry).grid(row=5, column=3)
+tkinter.Label(stform, text="Order type: ").grid(row=3, column=0)
+orderTypeSelect = box(stform, ('Buy', 'Sell', 'Buy-to-cover', 'Short-sell'), 3, 1)
+print(orderTypeSelect['values'])
+stockPrice = -1
+quantity = 0
+
+def updatePrice(event): 
+    print("Updating price!")
+    try:
+        quantity = float(e2.get())
+    except ValueError:
+        return 0
+    if(orderTypeSelect.current() <= 0):
+        priceBox.config(text = "Set order type first!")
+        return
+    if(stockPrice < 0):
+        priceBox.config(text = "Stock ticker invalid!")
+        return
+    if(quantity <= 0):
+        priceBox.config(text = "Invalid quantity!")
+        return
+    priceBox.config(text = "Price: $" + str(stockPrice*quantity))
+
+def calculatePrice(event):
+    print("Calculating price!")
+    ticker = event.widget.get()
+    if(len(ticker) > 3):
+        end = datetime.utcnow()
+        start = end - timedelta(days = 7)
+        df = web.DataReader(ticker, "yahoo", start, end)
+        stockPrice = float(format(df["Close"][df.index[len(df.index)-1]], '.2f'))
+        print(stockPrice)
+    updatePrice(0)
 
 e1 = tkinter.Entry(stform)
+e1.bind("<Key>", calculatePrice)
 e2 = tkinter.Entry(stform)
+e2.bind("<Key>", updatePrice)
 
-e1.grid(row=0, column=1)
-e2.grid(row=0, column=4)
+e1.grid(row=1, column=1)
+e2.grid(row=1, column=4)
 
 stform.pack()
 
 stlist = tkinter.Frame(fr_list[6])
-
+raw_csvDF = pd.read_csv("traderAction.csv")
 #for index, row in df.iterrows():
 
 stlist.pack()
@@ -303,12 +313,6 @@ def plotRegression(portfolioChanges, spyChanges, fr):
     'Plot daily benchmark changes vs daily portfolio changes'
     X = portfolioChanges
     Y = spyChanges
-    n2 = ttk.Notebook(fr)
-    grph = ttk.Frame(n2)
-    smry = ttk.Frame(n2)
-    n2.add(grph, text="Graph")
-    n2.add(smry, text="Summary")
-    n2.pack()
     f = plt.figure(1, figsize=(10,8))
     #f1.add_subplot(111)
     #plt.ion()
@@ -324,9 +328,8 @@ def plotRegression(portfolioChanges, spyChanges, fr):
     plt.ylabel('Daily Benchmark Changes')
     # show this shit in gui
     print(results.summary())
-    tkinter.Label(smry, text=results.summary(), anchor=tkinter.W).pack()
     #plt.show()
-    canvas = FigureCanvasTkAgg(f, master=grph)
+    canvas = FigureCanvasTkAgg(f, master=fr)
     canvas.show()
     canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=1)
 
@@ -495,6 +498,12 @@ def profitFactor(finishedTrades):
     return profit/math.fabs(loss)
 
 # ----------- main ----------- #
+
+
+
+
+
+
 stockName = extractStockName(raw_csvDF)
 
 dateMin, dateMax = extractDateRange(raw_csvDF)
@@ -588,11 +597,6 @@ hitRatio_1 = calculateHitRatio(varList1, 5000)
 
 hitRatio_2 = calculateHitRatio(varList2, 5000)
 
-tkinter.Label(hr, text="Hit Ratio:    "+str(hitRatio)+"", anchor=tkinter.W, justify=tkinter.LEFT).pack(fill=tkinter.X)
-tkinter.Label(hr, text="Hit Ratio 2: "+str(hitRatio_0)+"", anchor=tkinter.W, justify=tkinter.LEFT).pack(fill=tkinter.X)
-tkinter.Label(hr, text="Hit Ratio 3: "+str(hitRatio_1)+"", anchor=tkinter.W, justify=tkinter.LEFT).pack(fill=tkinter.X)
-tkinter.Label(hr, text="Hit Ratio 4: "+str(hitRatio_2)+"", anchor=tkinter.W, justify=tkinter.LEFT).pack(fill=tkinter.X)
-
 print(hitRatio, hitRatio_0, hitRatio_1, hitRatio_2)
 
 print("--- calculateHitRatio() takes %s seconds ---" % (time.time() - start_time))
@@ -600,10 +604,7 @@ print("--- calculateHitRatio() takes %s seconds ---" % (time.time() - start_time
 # -------------calculate returns of each trade-------------#
 
 tradesOnHold, finishedTrades = extractTrades(csvDF, rawDF)
-tkinter.Label(wr, text="Win Ratio :    "+str(winRatio(finishedTrades)), anchor=tkinter.W, justify=tkinter.LEFT).pack(fill=tkinter.X)
-tkinter.Label(wr, text="Profit Ratio : "+str(profitFactor(finishedTrades)), anchor=tkinter.W, justify=tkinter.LEFT).pack(fill=tkinter.X)
-tkinter.Label(wr, text="Average Return per Trade : "+str(averageReturnPerTrade(finishedTrades)), anchor=tkinter.W, justify=tkinter.LEFT).pack(fill=tkinter.X)
 
 top.mainloop()
 
-top.destroy()
+
